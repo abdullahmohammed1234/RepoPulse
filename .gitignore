@@ -7,6 +7,7 @@ node_modules/
 .env.local
 .env.production
 .env.*.local
+!backend/.env.example
 
 # Build outputs
 backend/dist/
@@ -14,6 +15,8 @@ frontend/.next/
 frontend/out/
 frontend/build/
 frontend/.cache/
+
+docs/
 
 # IDE
 .vscode/
