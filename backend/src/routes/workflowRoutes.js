@@ -15,6 +15,51 @@ if (typeof logger.info !== 'function') {
 }
 
 // ============================================
+// Execution Routes (must be before /:id route)
+// ============================================
+
+/**
+ * GET /api/workflows/executions/all
+ * Get all executions (for dashboard)
+ */
+router.get('/executions/all', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const executions = await workflowService.getAllExecutions(limit);
+    res.json({ success: true, executions });
+  } catch (error) {
+    logger.error('Failed to get all executions:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/executions/:id
+ * Get execution by ID
+ */
+router.get('/executions/:id', async (req, res) => {
+  try {
+    const execution = await workflowService.getExecutionById(req.params.id);
+    
+    if (!execution) {
+      return res.status(404).json({ success: false, error: 'Execution not found' });
+    }
+    
+    // Get node executions
+    const nodeExecutions = await workflowService.getNodeExecutions(req.params.id);
+    
+    res.json({ 
+      success: true, 
+      execution,
+      nodeExecutions
+    });
+  } catch (error) {
+    logger.error('Failed to get execution:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
 // Workflow Management Routes
 // ============================================
 
@@ -182,12 +227,20 @@ router.post('/:id/execute', async (req, res) => {
       const currentNode = nodes.find(n => n.id === currentNodeId);
       
       if (!currentNode) {
+        logger.error(`Node not found: ${currentNodeId}`);
         break;
       }
       
       // Get node execution record
       const nodeExecutions = await workflowService.getNodeExecutions(execution.id);
       const nodeExecution = nodeExecutions.find(ne => ne.node_id === currentNodeId);
+      
+      // Skip if no node execution found
+      if (!nodeExecution) {
+        logger.error(`Node execution not found for node: ${currentNodeId}`);
+        currentNodeId = getNextNodeId(edges, currentNodeId);
+        continue;
+      }
       
       try {
         // Execute the node
@@ -199,25 +252,31 @@ router.post('/:id/execute', async (req, res) => {
         );
       } catch (nodeError) {
         // Mark as failed and stop execution
+        logger.error(`Node execution failed: ${currentNodeId} - ${nodeError.message}`);
         failedNode = currentNodeId;
         await workflowService.failExecution(execution.id, nodeError.message, currentNodeId);
         break;
       }
       
       // Find next node
-      const outgoingEdges = edges.filter(e => e.source === currentNodeId);
+      currentNodeId = getNextNodeId(edges, currentNodeId);
+    }
+    
+    // Helper function to get next node ID
+    function getNextNodeId(edges, nodeId) {
+      const outgoingEdges = edges.filter(e => e.source === nodeId);
       
       if (outgoingEdges.length === 0) {
-        break;
+        return null;
       }
       
       // Handle simple case - single edge
       if (outgoingEdges.length === 1) {
-        currentNodeId = outgoingEdges[0].target;
-      } else {
-        // Multiple edges - could have conditions (simplified for now)
-        currentNodeId = outgoingEdges[0].target;
+        return outgoingEdges[0].target;
       }
+      
+      // Multiple edges - could have conditions (simplified for now)
+      return outgoingEdges[0].target;
     }
     
     // If no failure, complete the execution
@@ -228,10 +287,22 @@ router.post('/:id/execute', async (req, res) => {
     // Get updated execution
     const updatedExecution = await workflowService.getExecutionById(execution.id);
     
+    // Safely parse output data
+    let output = null;
+    try {
+      if (updatedExecution?.output_data) {
+        output = typeof updatedExecution.output_data === 'string' 
+          ? JSON.parse(updatedExecution.output_data) 
+          : updatedExecution.output_data;
+      }
+    } catch (parseError) {
+      logger.warn('Failed to parse output_data:', parseError.message);
+    }
+    
     res.json({ 
       success: true, 
       execution: updatedExecution,
-      output: updatedExecution.output_data ? JSON.parse(updatedExecution.output_data) : null
+      output
     });
     
   } catch (error) {
@@ -251,47 +322,6 @@ router.get('/:id/executions', async (req, res) => {
     res.json({ success: true, executions });
   } catch (error) {
     logger.error('Failed to get executions:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/executions/:id
- * Get execution by ID
- */
-router.get('/executions/:id', async (req, res) => {
-  try {
-    const execution = await workflowService.getExecutionById(req.params.id);
-    
-    if (!execution) {
-      return res.status(404).json({ success: false, error: 'Execution not found' });
-    }
-    
-    // Get node executions
-    const nodeExecutions = await workflowService.getNodeExecutions(req.params.id);
-    
-    res.json({ 
-      success: true, 
-      execution,
-      nodeExecutions
-    });
-  } catch (error) {
-    logger.error('Failed to get execution:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/executions
- * Get all executions (for dashboard)
- */
-router.get('/executions/all', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 50;
-    const executions = await workflowService.getAllExecutions(limit);
-    res.json({ success: true, executions });
-  } catch (error) {
-    logger.error('Failed to get all executions:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

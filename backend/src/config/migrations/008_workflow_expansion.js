@@ -7,6 +7,11 @@ const { pool } = require('../db');
 
 const migrationSQL = `
 -- ============================================
+-- REQUIRED EXTENSIONS
+-- ============================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================
 -- WORKFLOW EXPANSION TABLES
 -- ============================================
 

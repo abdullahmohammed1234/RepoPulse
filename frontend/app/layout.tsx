@@ -75,6 +75,18 @@ export default function RootLayout({
                 >
                   Analytics
                 </a>
+                <a
+                  href="/admin/webhooks"
+                  className="transition-colors hover:text-primary/80 text-foreground/80"
+                >
+                  Webhooks
+                </a>
+                <a
+                  href="/team"
+                  className="transition-colors hover:text-primary/80 text-foreground/80"
+                >
+                  Team
+                </a>
               </nav>
             </div>
           </header>

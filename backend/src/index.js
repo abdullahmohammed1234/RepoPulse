@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const http = require('http');
 
 const repositoryRoutes = require('./routes/repositoryRoutes');
 const prRoutes = require('./routes/prRoutes');
@@ -18,6 +19,10 @@ const evaluationRoutes = require('./routes/evaluationRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
 const modelRouterRoutes = require('./routes/modelRouterRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
+const teamRoutes = require('./routes/teamRoutes');
+
+const realtimeService = require('./services/realtimeService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -62,6 +67,8 @@ app.use('/api/evaluation', evaluationRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/model-router', modelRouterRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/team', teamRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -77,18 +84,54 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize WebSocket server
+realtimeService.initializeRealtimeServer(server);
+
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   🚀 RepoPulse Backend Server                            ║
 ║                                                           ║
 ║   Server running on: http://localhost:${PORT}              ║
+║   WebSocket: ws://localhost:${PORT}/ws                    ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                       ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
 });
 
-module.exports = app;
+// Graceful shutdown
+const gracefulShutdown = async () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  
+  try {
+    // Shutdown WebSocket server
+    const realtimeService = require('./services/realtimeService');
+    realtimeService.shutdown();
+    
+    // Close HTTP server
+    server.close(() => {
+      console.log('✅ HTTP server closed');
+      process.exit(0);
+    });
+    
+    // Force exit after 10 seconds
+    setTimeout(() => {
+      console.error('❌ Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  } catch (error) {
+    console.error('Shutdown error:', error);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+module.exports = { app, server };
