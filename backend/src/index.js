@@ -15,6 +15,9 @@ const exportRoutes = require('./routes/exportRoutes');
 const personalizationRoutes = require('./routes/personalizationRoutes');
 const promptExperimentRoutes = require('./routes/promptExperimentRoutes');
 const evaluationRoutes = require('./routes/evaluationRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
+const modelRouterRoutes = require('./routes/modelRouterRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -56,6 +59,9 @@ app.use('/api/export', exportRoutes);
 app.use('/api/personalization', personalizationRoutes);
 app.use('/api/prompt-experiments', promptExperimentRoutes);
 app.use('/api/evaluation', evaluationRoutes);
+app.use('/api/workflows', workflowRoutes);
+app.use('/api/model-router', modelRouterRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

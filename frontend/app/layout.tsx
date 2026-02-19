@@ -63,6 +63,18 @@ export default function RootLayout({
                 >
                   Experiments
                 </a>
+                <a
+                  href="/admin/workflows"
+                  className="transition-colors hover:text-primary/80 text-foreground/80"
+                >
+                  Workflows
+                </a>
+                <a
+                  href="/admin/analytics"
+                  className="transition-colors hover:text-primary/80 text-foreground/80"
+                >
+                  Analytics
+                </a>
               </nav>
             </div>
           </header>
