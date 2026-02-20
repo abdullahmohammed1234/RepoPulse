@@ -1172,3 +1172,293 @@ export async function getEventTriggers(repositoryId: number): Promise<{ triggers
 
   return response.json();
 }
+
+// ============================================
+// Code Quality Metrics API
+// ============================================
+
+/**
+ * Code Quality Analysis Types
+ */
+
+export interface ComplexityMetrics {
+  overallComplexity: number;
+  averageComplexity: number;
+  functions: Array<{
+    name: string;
+    complexity: number;
+    startLine: number;
+    endLine: number;
+    rating: string;
+  }>;
+  rating: string;
+  thresholds: {
+    low: number;
+    medium: number;
+    high: number;
+    critical: number;
+  };
+  lineCount: number;
+  linesPerComplexity: number;
+}
+
+export interface TechnicalDebt {
+  totalMinutes: number;
+  totalHours: number;
+  totalDays: number;
+  breakdown: Array<{
+    category: string;
+    items?: number;
+    minutes: number;
+    description: string;
+  }>;
+  priority: string;
+  recommendation: string;
+}
+
+export interface CoverageMetrics {
+  coverage: {
+    line: number;
+    statement: number;
+    function: number;
+    branch: number;
+  };
+  scores: {
+    line: number;
+    statement: number;
+    function: number;
+    branch: number;
+  };
+  overall: number;
+  rating: string;
+  recommendation: string;
+}
+
+export interface ESLintResults {
+  results: Array<{
+    filePath: string;
+    messages: Array<{
+      line: number;
+      column: number;
+      severity: string;
+      rule: string;
+      message: string;
+    }>;
+    errorCount: number;
+    warningCount: number;
+  }>;
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+  totalIssues: number;
+  summary: string;
+}
+
+export interface SonarQubeMetrics {
+  project: string;
+  metrics: {
+    complexity: number;
+    coverage: number;
+    duplicatedLines: number;
+    linesOfCode: number;
+    codeSmells: number;
+    bugs: number;
+    vulnerabilities: number;
+    debtRatio: number;
+  };
+  complexity: number;
+  coverage: number;
+  duplicatedLines: number;
+  linesOfCode: number;
+  codeSmells: number;
+  bugs: number;
+  vulnerabilities: number;
+  debtRatio: number;
+  rating: string;
+}
+
+export interface QualityReport {
+  timestamp: string;
+  complexity: ComplexityMetrics;
+  eslint?: ESLintResults;
+  technicalDebt: TechnicalDebt;
+  coverage?: CoverageMetrics;
+  sonarQube?: {
+    metrics: SonarQubeMetrics;
+    issues: unknown[];
+    issueCount: number;
+  };
+  overallScore: {
+    score: number;
+    grade: string;
+    factors: Array<{
+      factor: string;
+      impact: number;
+      description: string;
+    }>;
+    rating: string;
+  };
+}
+
+/**
+ * Analyze code quality metrics
+ */
+export async function analyzeCodeQuality(
+  code: string,
+  options?: {
+    runESLint?: boolean;
+    eslintOptions?: Record<string, unknown>;
+    coverageData?: Record<string, number>;
+    sonarProjectKey?: string;
+  }
+): Promise<{ success: boolean; data: QualityReport }> {
+  const response = await fetch(`${API_URL}/api/code-quality/analyze`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code, options: options || {} }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to analyze code quality');
+  }
+
+  return response.json();
+}
+
+/**
+ * Analyze cyclomatic complexity
+ */
+export async function analyzeComplexity(code: string): Promise<{ success: boolean; data: ComplexityMetrics }> {
+  const response = await fetch(`${API_URL}/api/code-quality/complexity`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to analyze complexity');
+  }
+
+  return response.json();
+}
+
+/**
+ * Estimate technical debt
+ */
+export async function estimateTechnicalDebt(
+  complexityMetrics: ComplexityMetrics,
+  eslintResults?: ESLintResults,
+  sonarResults?: { issues: unknown[] }
+): Promise<{ success: boolean; data: TechnicalDebt }> {
+  const response = await fetch(`${API_URL}/api/code-quality/debt`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ complexityMetrics, eslintResults, sonarResults }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to estimate technical debt');
+  }
+
+  return response.json();
+}
+
+/**
+ * Analyze code coverage
+ */
+export async function analyzeCoverage(coverageData: Record<string, number>): Promise<{ success: boolean; data: CoverageMetrics }> {
+  const response = await fetch(`${API_URL}/api/code-quality/coverage`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ coverageData }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to analyze coverage');
+  }
+
+  return response.json();
+}
+
+/**
+ * Run ESLint analysis
+ */
+export async function runESLint(code: string, options?: Record<string, unknown>): Promise<{ success: boolean; data: ESLintResults }> {
+  const response = await fetch(`${API_URL}/api/code-quality/eslint`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code, options: options || {} }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to run ESLint analysis');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get SonarQube metrics
+ */
+export async function getSonarQubeMetrics(projectKey: string): Promise<{
+  success: boolean;
+  data: {
+    metrics: SonarQubeMetrics;
+    issues: unknown[];
+    issueCount: number;
+  };
+}> {
+  const response = await fetch(`${API_URL}/api/code-quality/sonar/${projectKey}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch SonarQube metrics');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get code quality service health
+ */
+export async function getCodeQualityHealth(): Promise<{
+  success: boolean;
+  data: {
+    status: string;
+    sonarQube: {
+      configured: boolean;
+      url: string;
+    };
+    features: {
+      complexityAnalysis: boolean;
+      eslintIntegration: boolean;
+      sonarQubeIntegration: boolean;
+      coverageAnalysis: boolean;
+      debtEstimation: boolean;
+    };
+  };
+}> {
+  const response = await fetch(`${API_URL}/api/code-quality/health`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to get code quality health');
+  }
+
+  return response.json();
+}

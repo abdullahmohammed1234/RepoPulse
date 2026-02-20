@@ -21,6 +21,7 @@ const modelRouterRoutes = require('./routes/modelRouterRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const teamRoutes = require('./routes/teamRoutes');
+const codeQualityRoutes = require('./routes/codeQualityRoutes');
 
 const realtimeService = require('./services/realtimeService');
 
@@ -69,6 +70,7 @@ app.use('/api/model-router', modelRouterRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/code-quality', codeQualityRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

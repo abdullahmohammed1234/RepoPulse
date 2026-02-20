@@ -88,6 +88,12 @@ export default function RootLayout({
                   Webhooks
                 </a>
                 <a
+                  href="/admin/code-quality"
+                  className="transition-colors hover:text-primary/80 text-foreground/80"
+                >
+                  Code Quality
+                </a>
+                <a
                   href="/team"
                   className="transition-colors hover:text-primary/80 text-foreground/80"
                 >

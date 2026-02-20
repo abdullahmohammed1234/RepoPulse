@@ -11,6 +11,7 @@ import {
   AlertCircle, Lightbulb, Info, Target, Sparkles, Download
 } from 'lucide-react';
 import FeedbackButton from '@/components/FeedbackButton';
+import QuickCodeAnalyzer from '@/components/QuickCodeAnalyzer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -948,6 +949,9 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              {/* Quick Code Quality Analyzer */}
+              <QuickCodeAnalyzer />
 
               {/* Charts */}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 md:col-span-2">
