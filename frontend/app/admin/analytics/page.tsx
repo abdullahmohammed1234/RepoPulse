@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Users, FileText, Zap, DollarSign, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Clock, Activity } from 'lucide-react';
+import TrendAnalysis from '@/components/TrendAnalysis';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -313,6 +314,11 @@ export default function AnalyticsPage() {
             <span>No active alerts - system is healthy</span>
           </div>
         )}
+      </div>
+
+      {/* Trend Analysis Section */}
+      <div className="bg-card border border-border rounded-xl p-6">
+        <TrendAnalysis />
       </div>
     </div>
   );

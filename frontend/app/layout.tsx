@@ -76,6 +76,12 @@ export default function RootLayout({
                   Analytics
                 </a>
                 <a
+                  href="/admin/trends"
+                  className="transition-colors hover:text-primary/80 text-foreground/80"
+                >
+                  Trends
+                </a>
+                <a
                   href="/admin/webhooks"
                   className="transition-colors hover:text-primary/80 text-foreground/80"
                 >

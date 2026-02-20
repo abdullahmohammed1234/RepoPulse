@@ -5,6 +5,7 @@ const GitHubService = require('../services/githubService');
 const featureService = require('../services/featureService');
 const mlService = require('../services/mlService');
 const benchmarkService = require('../services/benchmarkService');
+const analyticsService = require('../services/analyticsService');
 
 // GET /api/repository - Get all repositories
 router.get('/', async (req, res) => {
@@ -116,7 +117,14 @@ router.post('/analyze', async (req, res) => {
     // Step 5: Calculate health score
     const healthData = await featureService.calculateHealthScore(repositoryId);
     
-    // Step 6: Compute benchmarks for all repositories (system-wide)
+    // Step 6: Record health snapshot for trend analysis
+    try {
+      await analyticsService.recordRepositoryHealth(repositoryId);
+    } catch (healthError) {
+      console.error('Failed to record health snapshot:', healthError);
+    }
+    
+    // Step 7: Compute benchmarks for all repositories (system-wide)
     let benchmarkResult = null;
     try {
       benchmarkResult = await benchmarkService.computeBenchmarks();

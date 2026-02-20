@@ -514,6 +514,506 @@ async function getRealtimeStats() {
   }
 }
 
+/**
+ * ========================================================================
+ * TREND ANALYSIS & HISTORICAL INSIGHTS (Phase 4)
+ * ========================================================================
+ */
+
+/**
+ * Record repository health snapshot (called after analysis)
+ */
+async function recordRepositoryHealth(repositoryId) {
+  try {
+    // Get current repository metrics
+    const repoResult = await query(
+      `SELECT r.health_score, r.name 
+       FROM repositories r WHERE r.id = $1`,
+      [repositoryId]
+    );
+    
+    if (repoResult.rows.length === 0) {
+      throw new Error('Repository not found');
+    }
+    
+    const repo = repoResult.rows[0];
+    
+    // Get metrics from repository_metrics table
+    const metricsResult = await query(
+      `SELECT * FROM repository_metrics WHERE repository_id = $1 ORDER BY id DESC LIMIT 1`,
+      [repositoryId]
+    );
+    
+    // Get contributor count
+    const contributorResult = await query(
+      `SELECT COUNT(*) as count FROM contributors WHERE repository_id = $1 AND is_active = true`,
+      [repositoryId]
+    );
+    
+    // Get PR stats
+    const prStatsResult = await query(
+      `SELECT 
+         COUNT(*) as total_prs,
+         SUM(CASE WHEN is_merged = true OR state = 'merged' THEN 1 ELSE 0 END) as merged_prs,
+         AVG(risk_score) as avg_risk,
+         AVG(time_to_merge_hours) as avg_merge_time
+       FROM pull_requests 
+       WHERE repository_id = $1`,
+      [repositoryId]
+    );
+    
+    // Get commit stats
+    const commitResult = await query(
+      `SELECT 
+         COUNT(*) as total_commits,
+         SUM(additions) as total_additions,
+         SUM(deletions) as total_deletions
+       FROM commits 
+       WHERE repository_id = $1`,
+      [repositoryId]
+    );
+    
+    // Get open PRs count
+    const openPRsResult = await query(
+      `SELECT COUNT(*) as count FROM pull_requests WHERE repository_id = $1 AND state = 'open'`,
+      [repositoryId]
+    );
+    
+    const metrics = metricsResult.rows[0] || {};
+    const prStats = prStatsResult.rows[0] || {};
+    const commits = commitResult.rows[0] || {};
+    
+    // Insert historical record
+    await query(
+      `INSERT INTO repository_health_history 
+       (repository_id, health_score, momentum_score, churn_index, risk_index, 
+        velocity_index, anomaly_count, active_contributors, open_prs, merged_prs,
+        avg_pr_risk, avg_merge_time_hours, total_commits, total_additions, total_deletions)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (repository_id, recorded_at) DO NOTHING`,
+      [
+        repositoryId,
+        repo.health_score || 0,
+        metrics.momentum_score || 0,
+        metrics.churn_index || 0,
+        metrics.risk_index || 0,
+        metrics.velocity_index || 0,
+        metrics.anomaly_count || 0,
+        parseInt(contributorResult.rows[0]?.count) || 0,
+        parseInt(openPRsResult.rows[0]?.count) || 0,
+        parseInt(prStats.merged_prs) || 0,
+        parseFloat(prStats.avg_risk) || 0,
+        parseFloat(prStats.avg_merge_time) || 0,
+        parseInt(commits.total_commits) || 0,
+        parseInt(commits.total_additions) || 0,
+        parseInt(commits.total_deletions) || 0
+      ]
+    );
+    
+    logger.info(`Health snapshot recorded for repository ${repositoryId}`);
+    return { success: true };
+  } catch (error) {
+    logger.error('Failed to record repository health:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get health score trends for a repository
+ */
+async function getHealthScoreTrends(repositoryId, days = 30) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  try {
+    const result = await query(
+      `SELECT 
+         DATE(recorded_at) as date,
+         health_score,
+         momentum_score,
+         churn_index,
+         risk_index,
+         velocity_index,
+         active_contributors,
+         open_prs,
+         merged_prs,
+         avg_pr_risk,
+         avg_merge_time_hours
+       FROM repository_health_history 
+       WHERE repository_id = $1 AND recorded_at >= $2
+       ORDER BY recorded_at ASC`,
+      [repositoryId, startDate]
+    );
+    
+    return result.rows.map(row => ({
+      date: row.date,
+      healthScore: parseInt(row.health_score) || 0,
+      momentumScore: parseFloat(row.momentum_score) || 0,
+      churnIndex: parseFloat(row.churn_index) || 0,
+      riskIndex: parseFloat(row.risk_index) || 0,
+      velocityIndex: parseFloat(row.velocity_index) || 0,
+      activeContributors: parseInt(row.active_contributors) || 0,
+      openPRs: parseInt(row.open_prs) || 0,
+      mergedPRs: parseInt(row.merged_prs) || 0,
+      avgPRRisk: parseFloat(row.avg_pr_risk) || 0,
+      avgMergeTimeHours: parseFloat(row.avg_merge_time_hours) || 0
+    }));
+  } catch (error) {
+    logger.error('Failed to get health score trends:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Get repository trends (improving vs declining)
+ */
+async function getRepositoryTrends(days = 30) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  try {
+    // Get all repositories with their basic info
+    const allReposResult = await query(
+      `SELECT 
+         r.id,
+         r.name,
+         r.full_name,
+         r.health_score,
+         r.language,
+         r.is_active
+       FROM repositories r
+       WHERE r.is_active = true
+       ORDER BY r.id
+       LIMIT 100`
+    );
+    
+    // Get health history data for comparison
+    const healthHistoryResult = await query(
+      `SELECT 
+         h.repository_id,
+         h.health_score,
+         h.momentum_score,
+         h.churn_index,
+         h.recorded_at,
+         LAG(h.health_score) OVER (PARTITION BY h.repository_id ORDER BY h.recorded_at) as prev_health
+       FROM repository_health_history h
+       WHERE h.recorded_at >= $1
+       ORDER BY h.repository_id, h.recorded_at DESC
+       LIMIT 200`,
+      [startDate]
+    );
+    
+    // Group health history by repository
+    const healthMap = new Map();
+    for (const row of healthHistoryResult.rows) {
+      if (!healthMap.has(row.repository_id)) {
+        healthMap.set(row.repository_id, {
+          currentHealth: parseInt(row.health_score) || 0,
+          prevHealth: parseInt(row.prev_health) || 0,
+          healthChange: (parseInt(row.health_score) || 0) - (parseInt(row.prev_health) || 0),
+          momentumScore: parseFloat(row.momentum_score) || 0,
+          churnIndex: parseFloat(row.churn_index) || 0
+        });
+      }
+    }
+    
+    // Build repository list with trends
+    const repos = allReposResult.rows.map(row => {
+      const healthData = healthMap.get(row.id);
+      const currentHealth = healthData?.currentHealth || parseInt(row.health_score) || 50;
+      const healthChange = healthData?.healthChange || 0;
+      
+      let trend = 'stable';
+      if (healthChange > 5) trend = 'improving';
+      else if (healthChange < -5) trend = 'declining';
+      else if (healthData === undefined && parseInt(row.health_score) > 0) {
+        // Has health score but no history = new/stable
+        trend = 'stable';
+      }
+      
+      return {
+        id: row.id,
+        name: row.name,
+        fullName: row.full_name,
+        currentHealth,
+        previousHealth: healthData?.prevHealth || currentHealth,
+        healthChange,
+        trend,
+        language: row.language,
+        momentumScore: healthData?.momentumScore || 0,
+        churnIndex: healthData?.churnIndex || 0
+      };
+    });
+    
+    // Categorize
+    const improving = repos.filter(r => r.trend === 'improving');
+    const declining = repos.filter(r => r.trend === 'declining');
+    const stable = repos.filter(r => r.trend === 'stable');
+    
+    return {
+      repositories: repos,
+      summary: {
+        total: repos.length,
+        improving: improving.length,
+        declining: declining.length,
+        stable: stable.length,
+        avgHealthChange: repos.length > 0 
+          ? (repos.reduce((sum, r) => sum + r.healthChange, 0) / repos.length).toFixed(1) 
+          : 0
+      },
+      topImproving: improving.slice(0, 5),
+      topDeclining: declining.slice(0, 5)
+    };
+  } catch (error) {
+    logger.error('Failed to get repository trends:', error.message);
+    return { repositories: [], summary: { total: 0, improving: 0, declining: 0, stable: 0 } };
+  }
+}
+
+/**
+ * Compare metrics across time periods
+ */
+async function compareTimePeriods(repositoryId, period1Days = 7, period2Days = 30) {
+  const now = new Date();
+  const period1Start = new Date(now);
+  period1Start.setDate(period1Start.getDate() - period1Days);
+  
+  const period2Start = new Date(now);
+  period2Start.setDate(period2Start.getDate() - period2Days);
+  
+  try {
+    // Get period 1 metrics (recent)
+    const period1 = await query(
+      `SELECT 
+         COUNT(DISTINCT pr.id) as pr_count,
+         SUM(CASE WHEN pr.is_merged = true OR pr.state = 'merged' THEN 1 ELSE 0 END) as merged_prs,
+         AVG(pr.risk_score) as avg_risk,
+         AVG(pr.time_to_merge_hours) as avg_merge_time,
+         COUNT(DISTINCT c.id) as contributors
+       FROM pull_requests pr
+       LEFT JOIN contributors c ON c.repository_id = pr.repository_id
+       WHERE pr.repository_id = $1 AND pr.created_at >= $2`,
+      [repositoryId, period1Start]
+    );
+    
+    // Get period 2 metrics (older)
+    const period2 = await query(
+      `SELECT 
+         COUNT(DISTINCT pr.id) as pr_count,
+         SUM(CASE WHEN pr.is_merged = true OR pr.state = 'merged' THEN 1 ELSE 0 END) as merged_prs,
+         AVG(pr.risk_score) as avg_risk,
+         AVG(pr.time_to_merge_hours) as avg_merge_time,
+         COUNT(DISTINCT c.id) as contributors
+       FROM pull_requests pr
+       LEFT JOIN contributors c ON c.repository_id = pr.repository_id
+       WHERE pr.repository_id = $1 AND pr.created_at >= $2 AND pr.created_at < $3`,
+      [repositoryId, period2Start, period1Start]
+    );
+    
+    const p1 = period1.rows[0] || {};
+    const p2 = period2.rows[0] || {};
+    
+    const metrics = ['pr_count', 'merged_prs', 'avg_risk', 'avg_merge_time', 'contributors'];
+    const comparison = {};
+    
+    for (const metric of metrics) {
+      const val1 = parseFloat(p1[metric]) || 0;
+      const val2 = parseFloat(p2[metric]) || 0;
+      const change = val2 > 0 ? ((val1 - val2) / val2 * 100).toFixed(1) : 0;
+      
+      comparison[metric] = {
+        period1: val1,
+        period2: val2,
+        change: parseFloat(change),
+        direction: val1 > val2 ? 'up' : val1 < val2 ? 'down' : 'stable'
+      };
+    }
+    
+    return {
+      period1: { days: period1Days, start: period1Start.toISOString() },
+      period2: { days: period2Days, start: period2Start.toISOString() },
+      comparison
+    };
+  } catch (error) {
+    logger.error('Failed to compare time periods:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Get long-term churn predictions
+ */
+async function getChurnPredictions(repositoryId) {
+  try {
+    // Get repository features for prediction
+    const repoResult = await query(
+      `SELECT 
+         r.id, r.health_score,
+         COUNT(DISTINCT pr.id) as total_prs,
+         SUM(CASE WHEN pr.state = 'open' THEN 1 ELSE 0 END) as open_prs,
+         AVG(pr.risk_score) as avg_risk,
+         COUNT(DISTINCT c.id) as contributors
+       FROM repositories r
+       LEFT JOIN pull_requests pr ON r.id = pr.repository_id
+       LEFT JOIN contributors c ON r.id = c.repository_id
+       WHERE r.id = $1
+       GROUP BY r.id`,
+      [repositoryId]
+    );
+    
+    if (repoResult.rows.length === 0) {
+      return null;
+    }
+    
+    const repo = repoResult.rows[0];
+    
+    // Get recent activity trends
+    const recentHistory = await query(
+      `SELECT 
+         health_score,
+         churn_index,
+         velocity_index,
+         recorded_at
+       FROM repository_health_history 
+       WHERE repository_id = $1
+       ORDER BY recorded_at DESC
+       LIMIT 14`,
+      [repositoryId]
+    );
+    
+    // Calculate trend from history
+    let churnTrend = 'stable';
+    let riskTrend = 'stable';
+    
+    if (recentHistory.rows.length >= 7) {
+      const recent7 = recentHistory.rows.slice(0, 7);
+      const older7 = recentHistory.rows.slice(7);
+      
+      if (older7.length > 0) {
+        const avgChurnRecent = recent7.reduce((s, r) => s + (parseFloat(r.churn_index) || 0), 0) / recent7.length;
+        const avgChurnOlder = older7.reduce((s, r) => s + (parseFloat(r.churn_index) || 0), 0) / older7.length;
+        
+        if (avgChurnRecent > avgChurnOlder * 1.2) churnTrend = 'increasing';
+        else if (avgChurnRecent < avgChurnOlder * 0.8) churnTrend = 'decreasing';
+        
+        const avgRiskRecent = recent7.reduce((s, r) => s + (parseFloat(r.health_score) || 0), 0) / recent7.length;
+        const avgRiskOlder = older7.reduce((s, r) => s + (parseFloat(r.health_score) || 0), 0) / older7.length;
+        
+        if (avgRiskRecent > avgRiskOlder * 1.1) riskTrend = 'improving';
+        else if (avgRiskRecent < avgRiskOlder * 0.9) riskTrend = 'declining';
+      }
+    }
+    
+    // Calculate churn probability based on features
+    const healthScore = parseInt(repo.health_score) || 50;
+    const avgRisk = parseFloat(repo.avg_risk) || 0.5;
+    const openPRs = parseInt(repo.open_prs) || 0;
+    const contributors = parseInt(repo.contributors) || 1;
+    
+    // Churn risk factors
+    const lowHealthFactor = healthScore < 40 ? 0.4 : healthScore < 60 ? 0.2 : 0;
+    const highRiskFactor = avgRisk > 0.7 ? 0.3 : avgRisk > 0.5 ? 0.15 : 0;
+    const lowActivityFactor = openPRs === 0 && contributors < 2 ? 0.2 : 0;
+    const inactivityTrend = churnTrend === 'increasing' ? 0.2 : 0;
+    
+    const churnProbability = Math.min(1, Math.max(0, 
+      0.1 + lowHealthFactor + highRiskFactor + lowActivityFactor + inactivityTrend
+    ));
+    
+    // Predictions for next 30 days
+    const predictedChurn30d = churnProbability > 0.5 ? 
+      Math.round(churnProbability * (openPRs + contributors) * 0.3) : 0;
+    
+    return {
+      repositoryId,
+      currentHealth: healthScore,
+      churnProbability: Math.round(churnProbability * 100) / 100,
+      churnRisk: churnProbability > 0.6 ? 'High' : churnProbability > 0.3 ? 'Medium' : 'Low',
+      churnTrend,
+      riskTrend,
+      metrics: {
+        avgRiskScore: parseFloat(avgRisk).toFixed(2),
+        openPRs,
+        contributors,
+        recentHealthTrend: riskTrend
+      },
+      predictions: {
+        churn30d: predictedChurn30d,
+        health30d: riskTrend === 'improving' ? Math.min(100, healthScore + 10) : 
+                    riskTrend === 'declining' ? Math.max(0, healthScore - 15) : healthScore
+      },
+      factors: [
+        { factor: 'Health Score', impact: lowHealthFactor > 0 ? 'negative' : 'neutral' },
+        { factor: 'Risk Level', impact: highRiskFactor > 0 ? 'negative' : 'neutral' },
+        { factor: 'Activity', impact: lowActivityFactor > 0 ? 'negative' : 'neutral' }
+      ]
+    };
+  } catch (error) {
+    logger.error('Failed to get churn predictions:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Get system-wide trend summary
+ */
+async function getSystemTrends(days = 30) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  try {
+    // Get system-wide metrics
+    const result = await query(
+      `SELECT 
+         COUNT(DISTINCT r.id) as total_repos,
+         AVG(r.health_score) as avg_health,
+         COUNT(DISTINCT pr.id) as total_prs,
+         SUM(CASE WHEN pr.is_merged = true OR pr.state = 'merged' THEN 1 ELSE 0 END) as merged_prs,
+         COUNT(DISTINCT c.id) as contributors
+       FROM repositories r
+       LEFT JOIN pull_requests pr ON r.id = pr.repository_id
+       LEFT JOIN contributors c ON r.id = c.repository_id
+       WHERE r.is_active = true`
+    );
+    
+    // Get recent snapshots if available
+    const snapshots = await query(
+      `SELECT * FROM system_trends 
+       WHERE snapshot_date >= $1
+       ORDER BY snapshot_date DESC
+       LIMIT 7`,
+      [startDate]
+    );
+    
+    const row = result.rows[0] || {};
+    
+    return {
+      period: { days, startDate: startDate.toISOString() },
+      current: {
+        totalRepositories: parseInt(row.total_repos) || 0,
+        avgHealthScore: Math.round(parseFloat(row.avg_health)) || 0,
+        totalPRs: parseInt(row.total_prs) || 0,
+        mergedPRs: parseInt(row.merged_prs) || 0,
+        mergeRate: row.total_prs > 0 ? 
+          ((parseInt(row.merged_prs) / parseInt(row.total_prs)) * 100).toFixed(1) : 0,
+        contributors: parseInt(row.contributors) || 0
+      },
+      history: snapshots.rows.map(s => ({
+        date: s.snapshot_date,
+        healthScore: parseInt(s.avg_health_score) || 0,
+        activeRepos: parseInt(s.active_repositories) || 0
+      })),
+      predicted: {
+        churn30d: snapshots.rows.length > 0 ? 
+          parseFloat(snapshots.rows[0].predicted_churn_30d) || 0 : 0
+      }
+    };
+  } catch (error) {
+    logger.error('Failed to get system trends:', error.message);
+    return null;
+  }
+}
+
 module.exports = {
   getDashboardMetrics,
   getFeedbackTrends,
@@ -522,5 +1022,11 @@ module.exports = {
   getModelPerformance,
   getCostBreakdown,
   getAlerts,
-  getRealtimeStats
+  getRealtimeStats,
+  recordRepositoryHealth,
+  getHealthScoreTrends,
+  getRepositoryTrends,
+  compareTimePeriods,
+  getChurnPredictions,
+  getSystemTrends
 };

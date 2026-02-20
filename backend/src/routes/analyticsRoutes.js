@@ -130,4 +130,122 @@ router.get('/realtime', async (req, res) => {
   }
 });
 
+/**
+ * ========================================================================
+ * TREND ANALYSIS ROUTES (Phase 4)
+ * ========================================================================
+ */
+
+/**
+ * POST /api/analytics/record-health
+ * Record a health snapshot for a repository
+ */
+router.post('/record-health', async (req, res) => {
+  try {
+    const { repositoryId } = req.body;
+    
+    if (!repositoryId) {
+      return res.status(400).json({ success: false, error: 'repositoryId is required' });
+    }
+    
+    const result = await analyticsService.recordRepositoryHealth(repositoryId);
+    res.json({ success: true, result });
+  } catch (error) {
+    logger.error('Failed to record health:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/health-trends/:repositoryId
+ * Get health score trends for a repository
+ */
+router.get('/health-trends/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const days = parseInt(req.query.days) || 30;
+    
+    const trends = await analyticsService.getHealthScoreTrends(
+      parseInt(repositoryId), 
+      days
+    );
+    
+    res.json({ success: true, trends });
+  } catch (error) {
+    logger.error('Failed to get health trends:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/repository-trends
+ * Get repository trends (improving vs declining)
+ */
+router.get('/repository-trends', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const trends = await analyticsService.getRepositoryTrends(days);
+    res.json({ success: true, trends });
+  } catch (error) {
+    logger.error('Failed to get repository trends:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/compare-periods/:repositoryId
+ * Compare metrics across different time periods
+ */
+router.get('/compare-periods/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const period1Days = parseInt(req.query.period1) || 7;
+    const period2Days = parseInt(req.query.period2) || 30;
+    
+    const comparison = await analyticsService.compareTimePeriods(
+      parseInt(repositoryId),
+      period1Days,
+      period2Days
+    );
+    
+    res.json({ success: true, comparison });
+  } catch (error) {
+    logger.error('Failed to compare periods:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/churn-predictions/:repositoryId
+ * Get long-term churn predictions
+ */
+router.get('/churn-predictions/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const predictions = await analyticsService.getChurnPredictions(
+      parseInt(repositoryId)
+    );
+    
+    res.json({ success: true, predictions });
+  } catch (error) {
+    logger.error('Failed to get churn predictions:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/system-trends
+ * Get system-wide trend summary
+ */
+router.get('/system-trends', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const trends = await analyticsService.getSystemTrends(days);
+    res.json({ success: true, trends });
+  } catch (error) {
+    logger.error('Failed to get system trends:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

@@ -140,6 +140,190 @@ export async function getFeedbackTrends(days: number = 30): Promise<{ trends: Fe
 }
 
 /**
+ * ========================================================================
+ * TREND ANALYSIS API (Phase 4)
+ * ========================================================================
+ */
+
+export interface HealthScoreTrend {
+  date: string;
+  healthScore: number;
+  momentumScore: number;
+  churnIndex: number;
+  riskIndex: number;
+  velocityIndex: number;
+  activeContributors: number;
+  openPRs: number;
+  mergedPRs: number;
+  avgPRRisk: number;
+  avgMergeTimeHours: number;
+}
+
+export interface RepositoryTrend {
+  id: number;
+  name: string;
+  fullName: string;
+  currentHealth: number;
+  previousHealth: number;
+  healthChange: number;
+  trend: 'improving' | 'declining' | 'stable';
+  language: string;
+  momentumScore: number;
+  churnIndex: number;
+}
+
+export interface TimePeriodComparison {
+  period1: { days: number; start: string };
+  period2: { days: number; start: string };
+  comparison: {
+    [key: string]: {
+      period1: number;
+      period2: number;
+      change: number;
+      direction: 'up' | 'down' | 'stable';
+    };
+  };
+}
+
+export interface ChurnPrediction {
+  repositoryId: number;
+  currentHealth: number;
+  churnProbability: number;
+  churnRisk: 'High' | 'Medium' | 'Low';
+  churnTrend: string;
+  riskTrend: string;
+  metrics: {
+    avgRiskScore: string;
+    openPRs: number;
+    contributors: number;
+    recentHealthTrend: string;
+  };
+  predictions: {
+    churn30d: number;
+    health30d: number;
+  };
+  factors: { factor: string; impact: string }[];
+}
+
+export interface SystemTrends {
+  period: { days: number; startDate: string };
+  current: {
+    totalRepositories: number;
+    avgHealthScore: number;
+    totalPRs: number;
+    mergedPRs: number;
+    mergeRate: string;
+    contributors: number;
+  };
+  history: { date: string; healthScore: number; activeRepos: number }[];
+  predicted: { churn30d: number };
+}
+
+/**
+ * Get health score trends for a repository
+ */
+export async function getHealthScoreTrends(repositoryId: number, days: number = 30): Promise<HealthScoreTrend[]> {
+  const response = await fetch(`${API_URL}/api/analytics/health-trends/${repositoryId}?days=${days}`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch health trends');
+  }
+  
+  const data = await response.json();
+  return data.trends || [];
+}
+
+/**
+ * Get repository trends (improving vs declining)
+ */
+export async function getRepositoryTrends(days: number = 30): Promise<{
+  repositories: RepositoryTrend[];
+  summary: { total: number; improving: number; declining: number; stable: number; avgHealthChange: string };
+  topImproving: RepositoryTrend[];
+  topDeclining: RepositoryTrend[];
+}> {
+  const response = await fetch(`${API_URL}/api/analytics/repository-trends?days=${days}`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch repository trends');
+  }
+  
+  const data = await response.json();
+  return data.trends;
+}
+
+/**
+ * Compare metrics across time periods
+ */
+export async function compareTimePeriods(
+  repositoryId: number, 
+  period1Days: number = 7, 
+  period2Days: number = 30
+): Promise<TimePeriodComparison> {
+  const response = await fetch(
+    `${API_URL}/api/analytics/compare-periods/${repositoryId}?period1=${period1Days}&period2=${period2Days}`
+  );
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to compare periods');
+  }
+  
+  const data = await response.json();
+  return data.comparison;
+}
+
+/**
+ * Get long-term churn predictions
+ */
+export async function getChurnPredictions(repositoryId: number): Promise<ChurnPrediction> {
+  const response = await fetch(`${API_URL}/api/analytics/churn-predictions/${repositoryId}`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch churn predictions');
+  }
+  
+  const data = await response.json();
+  return data.predictions;
+}
+
+/**
+ * Get system-wide trend summary
+ */
+export async function getSystemTrends(days: number = 30): Promise<SystemTrends> {
+  const response = await fetch(`${API_URL}/api/analytics/system-trends?days=${days}`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch system trends');
+  }
+  
+  const data = await response.json();
+  return data.trends;
+}
+
+/**
+ * Record a health snapshot for a repository
+ */
+export async function recordRepositoryHealth(repositoryId: number): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_URL}/api/analytics/record-health`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repositoryId })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to record health');
+  }
+  
+  return response.json();
+}
+
+/**
  * Get feedback constants (reason categories, issue types, etc.)
  */
 export async function getFeedbackConstants(): Promise<{
