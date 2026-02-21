@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, FileText, Zap, DollarSign, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Clock, Activity } from 'lucide-react';
+import { Users, FileText, Zap, DollarSign, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Clock, Activity, BarChart3, ArrowRight } from 'lucide-react';
 import TrendAnalysis from '@/components/TrendAnalysis';
+import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -101,16 +102,26 @@ export default function AnalyticsPage() {
           <h1 className="text-2xl font-bold text-foreground">Analytics Dashboard</h1>
           <p className="text-muted-foreground">Monitor system performance, usage, and costs</p>
         </div>
-        <select
-          value={days}
-          onChange={(e) => setDays(parseInt(e.target.value))}
-          className="px-4 py-2 bg-card border border-border rounded-lg text-foreground"
-        >
-          <option value={7}>Last 7 days</option>
-          <option value={14}>Last 14 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/analytics/visualizations"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Advanced Visualizations
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <select
+            value={days}
+            onChange={(e) => setDays(parseInt(e.target.value))}
+            className="px-4 py-2 bg-card border border-border rounded-lg text-foreground"
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={14}>Last 14 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+          </select>
+        </div>
       </div>
 
       {/* KPI Cards */}

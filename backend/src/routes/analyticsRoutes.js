@@ -1,11 +1,13 @@
 /**
  * Analytics API Routes
  * Phase 6: Admin & Analytics Dashboard
+ * Phase 8: Advanced Visualizations
  */
 
 const express = require('express');
 const router = express.Router();
 const analyticsService = require('../services/analyticsService');
+const githubService = require('../services/githubService');
 const logger = require('../services/logger');
 
 // Ensure logger has methods
@@ -244,6 +246,104 @@ router.get('/system-trends', async (req, res) => {
     res.json({ success: true, trends });
   } catch (error) {
     logger.error('Failed to get system trends:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ========================================================================
+ * ADVANCED VISUALIZATION ROUTES (Phase 8)
+ * ========================================================================
+ */
+
+/**
+ * GET /api/analytics/dependency-graph/:repositoryId
+ * Get dependency graph data for visualization
+ */
+router.get('/dependency-graph/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const githubToken = req.headers['x-github-token'];
+    
+    if (!githubToken) {
+      return res.status(401).json({ success: false, error: 'GitHub token required' });
+    }
+    
+    const graphData = await analyticsService.getDependencyGraph(
+      parseInt(repositoryId),
+      githubToken
+    );
+    
+    res.json({ success: true, graph: graphData });
+  } catch (error) {
+    logger.error('Failed to get dependency graph:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/contributor-network/:repositoryId
+ * Get contributor network data for visualization
+ */
+router.get('/contributor-network/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const githubToken = req.headers['x-github-token'];
+    
+    if (!githubToken) {
+      return res.status(401).json({ success: false, error: 'GitHub token required' });
+    }
+    
+    const networkData = await analyticsService.getContributorNetwork(
+      parseInt(repositoryId),
+      githubToken
+    );
+    
+    res.json({ success: true, network: networkData });
+  } catch (error) {
+    logger.error('Failed to get contributor network:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/code-heatmap/:repositoryId
+ * Get code heatmap data (files changed frequently)
+ */
+router.get('/code-heatmap/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const days = parseInt(req.query.days) || 90;
+    
+    const heatmapData = await analyticsService.getCodeHeatmap(
+      parseInt(repositoryId),
+      days
+    );
+    
+    res.json({ success: true, heatmap: heatmapData });
+  } catch (error) {
+    logger.error('Failed to get code heatmap:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/analytics/timeline/:repositoryId
+ * Get interactive timeline data
+ */
+router.get('/timeline/:repositoryId', async (req, res) => {
+  try {
+    const { repositoryId } = req.params;
+    const days = parseInt(req.query.days) || 90;
+    
+    const timelineData = await analyticsService.getTimelineData(
+      parseInt(repositoryId),
+      days
+    );
+    
+    res.json({ success: true, timeline: timelineData });
+  } catch (error) {
+    logger.error('Failed to get timeline data:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
