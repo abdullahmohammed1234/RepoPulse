@@ -45,6 +45,14 @@ export default function DependencyGraph({
   }, [data, selectedNode]);
 
   const fetchDependencyData = async () => {
+    // If no GitHub token is provided, show message asking for one
+    if (!githubToken) {
+      setLoading(false);
+      setError('A GitHub Personal Access Token is required to view dependency data.');
+      setData(null);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -65,12 +73,11 @@ export default function DependencyGraph({
         setData(result.graph);
       } else {
         setError(result.error || 'Failed to load dependency data');
-        // Load demo data for display
-        setData(generateDemoData());
+        setData(null);
       }
     } catch (err) {
       setError('Failed to connect to server');
-      setData(generateDemoData());
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -233,34 +240,53 @@ export default function DependencyGraph({
         Dependency Graph
       </div>
       
-      <div className="relative bg-slate-900 rounded-lg overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          onClick={handleCanvasClick}
-          className="w-full h-[400px] cursor-pointer"
-        />
-        
-        {/* Legend */}
-        <div className="absolute top-4 left-4 bg-slate-800/80 rounded p-3 text-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span className="text-slate-300">Root Repository</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-slate-500" />
-            <span className="text-slate-300">Dependency</span>
-          </div>
+      {!githubToken ? (
+        <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-lg text-center">
+          <Network className="w-12 h-12 text-slate-500 mb-4" />
+          <h3 className="text-lg font-medium text-slate-300 mb-2">GitHub PAT Required</h3>
+          <p className="text-slate-400 max-w-md">
+            A GitHub Personal Access Token is required to view dependency data. 
+            Please enter your GitHub PAT in the token field above to access this visualization.
+          </p>
         </div>
-        
-        {error && (
-          <div className="absolute bottom-4 left-4 bg-yellow-900/50 text-yellow-300 px-3 py-2 rounded text-sm">
-            Showing demo data: {error}
+      ) : data ? (
+        <div className="relative bg-slate-900 rounded-lg overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            onClick={handleCanvasClick}
+            className="w-full h-[400px] cursor-pointer"
+          />
+          
+          {/* Legend */}
+          <div className="absolute top-4 left-4 bg-slate-800/80 rounded p-3 text-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span className="text-slate-300">Root Repository</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-slate-500" />
+              <span className="text-slate-300">Dependency</span>
+            </div>
           </div>
-        )}
-      </div>
+          
+          {error && (
+            <div className="absolute bottom-4 left-4 bg-yellow-900/50 text-yellow-300 px-3 py-2 rounded text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-lg text-center">
+          <Network className="w-12 h-12 text-slate-500 mb-4" />
+          <h3 className="text-lg font-medium text-slate-300 mb-2">Unable to Load Dependencies</h3>
+          <p className="text-slate-400 max-w-md">
+            {error || 'Could not load dependency data. Please check your GitHub token and try again.'}
+          </p>
+        </div>
+      )}
       
       {/* Selected node details */}
-      {selectedNode && (
+      {selectedNode && data && (
         <div className="bg-slate-800 rounded-lg p-4">
           <h4 className="font-medium text-slate-200 mb-2">Selected: {selectedNode.name}</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
@@ -278,9 +304,11 @@ export default function DependencyGraph({
         </div>
       )}
       
-      <div className="text-sm text-slate-400">
-        {data?.nodes.length || 0} dependencies • Click nodes for details
-      </div>
+      {data && (
+        <div className="text-sm text-slate-400">
+          {data.nodes.length} dependencies • Click nodes for details
+        </div>
+      )}
     </div>
   );
 }
