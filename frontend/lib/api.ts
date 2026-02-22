@@ -712,7 +712,9 @@ export async function getTeam(teamId: number): Promise<{
   watchlist: WatchlistItem[];
   highRiskWatches: unknown[];
 }> {
-  const response = await fetch(`${API_URL}/api/team/teams/${teamId}`, {
+  // Add cache-busting timestamp to prevent 304 caching issues
+  const cacheBust = Date.now();
+  const response = await fetch(`${API_URL}/api/team/teams/${teamId}?_t=${cacheBust}`, {
     headers: getAuthHeaders(),
   });
 

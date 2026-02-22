@@ -446,6 +446,12 @@ router.post('/teams/:id/watchlist', getAuthenticatedUser, async (req, res) => {
       return res.status(400).json({ error: 'repository_id is required' });
     }
     
+    // Verify repository exists before adding to watchlist
+    const repoResult = await query('SELECT id FROM repositories WHERE id = $1', [repository_id]);
+    if (repoResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Repository not found' });
+    }
+    
     const watchlistItem = await teamService.addToWatchlist(teamId, repository_id, req.user.id, watch_settings);
     res.status(201).json({ watchlist: watchlistItem });
   } catch (error) {
@@ -463,6 +469,12 @@ router.delete('/teams/:id/watchlist/:repositoryId', getAuthenticatedUser, async 
     const isMember = await teamService.isTeamMember(teamId, req.user.id);
     if (!isMember) {
       return res.status(403).json({ error: 'Not a member of this team' });
+    }
+    
+    // Verify repository exists before removing from watchlist
+    const repoResult = await query('SELECT id FROM repositories WHERE id = $1', [repositoryId]);
+    if (repoResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Repository not found' });
     }
     
     await teamService.removeFromWatchlist(teamId, repositoryId);

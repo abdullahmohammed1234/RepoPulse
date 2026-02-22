@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeProvider";
 import { ClientLayout } from "@/components/ClientLayout";
+import { QueryProvider } from "@/lib/queryProvider";
 import { navItems } from "@/config/navItems";
 
 export const metadata: Metadata = {
@@ -18,9 +19,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <ThemeProvider>
-          <ClientLayout navItems={navItems}>
-            {children}
-          </ClientLayout>
+          <QueryProvider>
+            <ClientLayout navItems={navItems}>
+              {children}
+            </ClientLayout>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

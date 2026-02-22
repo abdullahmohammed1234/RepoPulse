@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Users, FileText, Zap, DollarSign, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Clock, Activity, BarChart3, ArrowRight } from 'lucide-react';
 import TrendAnalysis from '@/components/TrendAnalysis';
+import { LineChart, BarChart as DynamicBarChart, PieChart as DynamicPieChart } from '@/components/charts/dynamicCharts';
 import Link from 'next/link';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -25,38 +27,36 @@ interface Alert {
 }
 
 export default function AnalyticsPage() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
 
-  useEffect(() => {
-    fetchData();
-  }, [days]);
+  // React Query for caching and deduplication - replaces useEffect/fetchData
+  const { data: metricsData, isLoading: metricsLoading } = useQuery({
+    queryKey: ['analytics', 'dashboard', days],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/analytics/dashboard?days=${days}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to fetch metrics');
+      return data.metrics as DashboardMetrics;
+    },
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [metricsRes, alertsRes] = await Promise.all([
-        fetch(`${API_URL}/api/analytics/dashboard?days=${days}`),
-        fetch(`${API_URL}/api/analytics/alerts`)
-      ]);
-      
-      const metricsData = await metricsRes.json();
-      const alertsData = await alertsRes.json();
-      
-      if (metricsData.success) {
-        setMetrics(metricsData.metrics);
-      }
-      if (alertsData.success) {
-        setAlerts(alertsData.alerts);
-      }
-    } catch (err) {
-      console.error('Failed to fetch analytics:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: alertsData, isLoading: alertsLoading } = useQuery({
+    queryKey: ['analytics', 'alerts'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/analytics/alerts`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to fetch alerts');
+      return data.alerts as Alert[];
+    },
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+
+  const loading = metricsLoading || alertsLoading;
+  const metrics = metricsData || null;
+  const alerts = alertsData || [];
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
