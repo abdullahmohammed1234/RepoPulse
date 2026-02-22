@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import FeedbackButton from '@/components/FeedbackButton';
 import QuickCodeAnalyzer from '@/components/QuickCodeAnalyzer';
+import { Skeleton, RiskBadge, RiskLevelBadge } from '@/components/dashboard';
+
+const COLORS = ['#22c55e', '#eab308', '#ef4444'];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -85,60 +88,6 @@ interface TopChurnFile {
   filename: string;
   churn_score: number;
   modification_count: number;
-}
-
-const COLORS = ['#22c55e', '#eab308', '#ef4444'];
-
-function Skeleton({ className }: { className?: string }) {
-  return (
-    <div className={`animate-pulse bg-muted rounded ${className}`} />
-  );
-}
-
-// Enhanced RiskBadge with color indicators
-function RiskBadge({ score }: { score: number }) {
-  let color = 'bg-green-500';
-  let label = 'Low';
-  let textColor = 'text-green-500';
-  
-  if (score > 0.7) {
-    color = 'bg-red-500';
-    label = 'High';
-    textColor = 'text-red-500';
-  } else if (score > 0.4) {
-    color = 'bg-yellow-500';
-    label = 'Medium';
-    textColor = 'text-yellow-500';
-  }
-  
-  return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${color} text-white`}>
-      {label} ({(score * 100).toFixed(0)}%)
-    </span>
-  );
-}
-
-// Risk Level Badge with detailed color coding
-function RiskLevelBadge({ level }: { level?: string }) {
-  let classes = 'bg-gray-500';
-  let label = 'Unknown';
-  
-  if (level === 'High') {
-    classes = 'bg-red-500';
-    label = 'High Risk';
-  } else if (level === 'Medium') {
-    classes = 'bg-yellow-500';
-    label = 'Medium Risk';
-  } else if (level === 'Low') {
-    classes = 'bg-green-500';
-    label = 'Low Risk';
-  }
-  
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${classes} text-white`}>
-      {label}
-    </span>
-  );
 }
 
 // Top Factors Chart Component

@@ -22,6 +22,25 @@
     --ring: 217 91% 60%;
     --radius: 0.5rem;
   }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 91% 90%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 217 91% 90%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --ring: 217 91% 60%;
+  }
 }
 
 @layer base {
@@ -50,5 +69,18 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
+
+/* Light mode scrollbar */
+.light ::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.5);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary));
 }

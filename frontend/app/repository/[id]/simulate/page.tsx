@@ -7,6 +7,7 @@ import {
   Clock, Lightbulb, ArrowLeft, Loader2, Sparkles,
   Target, Zap, ChevronRight
 } from 'lucide-react';
+import { Breadcrumb } from '@/components/Breadcrumb';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -439,6 +440,14 @@ export default function SimulationPage() {
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
+          <Breadcrumb
+            items={[
+              { label: 'Dashboard', href: '/' },
+              { label: 'Repository', href: `/repository/${repositoryId}` },
+              { label: 'Simulate' },
+            ]}
+            className="mb-4"
+          />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
