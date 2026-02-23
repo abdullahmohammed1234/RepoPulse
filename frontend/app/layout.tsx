@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/ThemeProvider";
 import { ClientLayout } from "@/components/ClientLayout";
 import { QueryProvider } from "@/lib/queryProvider";
+import { Providers } from "@/components/Providers";
 import { navItems } from "@/config/navItems";
 
 export const metadata: Metadata = {
@@ -21,7 +22,9 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <ClientLayout navItems={navItems}>
-              {children}
+              <Providers>
+                {children}
+              </Providers>
             </ClientLayout>
           </QueryProvider>
         </ThemeProvider>

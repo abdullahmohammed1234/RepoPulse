@@ -13,6 +13,8 @@ import {
 import FeedbackButton from '@/components/FeedbackButton';
 import QuickCodeAnalyzer from '@/components/QuickCodeAnalyzer';
 import { Skeleton, RiskBadge, RiskLevelBadge } from '@/components/dashboard';
+import { toast } from 'sonner';
+import { ExportMenu } from '@/components/ExportMenu';
 
 const COLORS = ['#22c55e', '#eab308', '#ef4444'];
 
@@ -662,6 +664,10 @@ export default function Home() {
         throw new Error(data.error || 'Failed to analyze repository');
       }
       
+      toast.success('Repository analysis started', {
+        description: 'Fetching repository data...',
+      });
+      
       // Fetch overview data
       const overviewRes = await fetch(`${API_URL}/api/repository/${data.repositoryId}/overview`);
       const overviewData = await overviewRes.json();
@@ -686,8 +692,15 @@ export default function Home() {
       const contribsData = await contribsRes.json();
       setContributors(contribsData.contributors);
       
+      toast.success('Repository analyzed successfully', {
+        description: `Found ${overviewData.stats.total} pull requests`,
+      });
+      
     } catch (err: any) {
       setError(err.message);
+      toast.error('Failed to analyze repository', {
+        description: err.message,
+      });
     } finally {
       setLoading(false);
     }
@@ -792,6 +805,9 @@ export default function Home() {
             <div className="flex gap-2">
               <button
                 onClick={async () => {
+                  const loadingToast = toast.loading('Generating AI summary...', {
+                    description: 'This may take a moment',
+                  });
                   try {
                     // Generate a new UUID for this generation
                     const generationId = crypto.randomUUID();
@@ -800,10 +816,15 @@ export default function Home() {
                     const res = await fetch(`${API_URL}/api/generation/repository/${currentRepo.id}/summary`, { method: 'POST' });
                     const data = await res.json();
                     if (data.success) {
-                      alert(`AI Summary: ${data.data.summary}\n\n(Mock data: ${data.data.mock})`);
+                      toast.success('AI Summary Generated', {
+                        id: loadingToast,
+                        description: data.data.mock ? 'Using mock data' : 'Summary ready',
+                      });
                     }
                   } catch (err) {
-                    alert('Failed to generate summary');
+                    toast.error('Failed to generate summary', {
+                      id: loadingToast,
+                    });
                   }
                 }}
                 className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 flex items-center gap-2"
@@ -811,15 +832,22 @@ export default function Home() {
                 <Sparkles size={16} />
                 Generate AI Summary
               </button>
-              <button
-                onClick={async () => {
-                  window.open(`${API_URL}/api/export/repository/${currentRepo.id}?format=markdown`, '_blank');
-                }}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted flex items-center gap-2"
-              >
-                <Download size={16} />
-                Export
-              </button>
+              
+              {/* Export Menu */}
+              <ExportMenu
+                data={pullRequests}
+                filename={`${currentRepo?.name || 'repository'}-prs`}
+                columns={[
+                  { key: 'number', header: 'PR #' },
+                  { key: 'title', header: 'Title' },
+                  { key: 'state', header: 'State' },
+                  { key: 'risk_score', header: 'Risk Score' },
+                  { key: 'contributor_login', header: 'Author' },
+                ]}
+                onExportStart={() => toast.loading('Preparing export...')}
+                onExportSuccess={(format) => toast.success(`Exported as ${format}`, { description: `Download started for ${currentRepo?.name || 'repository'}` })}
+                onExportError={(err) => toast.error('Export failed', { description: err.message })}
+              />
             </div>
             <FeedbackButton generationId={currentGenerationId || ''} />
           </div>
@@ -852,6 +880,7 @@ export default function Home() {
               
               {/* Stats Cards */}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                {/* Total PRs */}
                 <div className="p-6 rounded-lg border border-border bg-card">
                   <div className="flex items-center gap-3 mb-2">
                     <Activity className="h-5 w-5 text-primary" />
@@ -863,6 +892,7 @@ export default function Home() {
                   </div>
                 </div>
                 
+                {/* High Risk PRs */}
                 <div className="p-6 rounded-lg border border-border bg-card">
                   <div className="flex items-center gap-3 mb-2">
                     <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -874,6 +904,7 @@ export default function Home() {
                   </div>
                 </div>
                 
+                {/* Contributors */}
                 <div className="p-6 rounded-lg border border-border bg-card">
                   <div className="flex items-center gap-3 mb-2">
                     <Users className="h-5 w-5 text-blue-500" />
@@ -885,6 +916,7 @@ export default function Home() {
                   </div>
                 </div>
                 
+                {/* Merge Rate */}
                 <div className="p-6 rounded-lg border border-border bg-card">
                   <div className="flex items-center gap-3 mb-2">
                     <TrendingUp className="h-5 w-5 text-green-500" />

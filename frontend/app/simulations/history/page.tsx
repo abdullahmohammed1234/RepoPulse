@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Github, ArrowLeft, Clock, AlertTriangle, 
-  TrendingDown, FileCode, Users, Activity
+  TrendingDown, FileCode, Users, Activity, Loader2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { useInfiniteScroll } from '@/lib/useInfiniteScroll';
+import { ExportMenu } from '@/components/ExportMenu';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -60,7 +63,32 @@ export default function SimulationsHistoryPage() {
     fetchRepositories();
   }, []);
 
-  // Fetch simulations when repository is selected
+  // Infinite scroll fetch function
+  const fetchSimulations = useCallback(async (page: number): Promise<Simulation[]> => {
+    if (!selectedRepo) return [];
+    
+    const response = await fetch(
+      `${API_URL}/api/repository/${selectedRepo}/simulations?userId=00000000-0000-0000-0000-000000000001&page=${page}&limit=10`
+    );
+    const data = await response.json();
+    return data.simulations || [];
+  }, [selectedRepo]);
+
+  // Use infinite scroll
+  const {
+    data: infiniteSimulations,
+    loading: infiniteLoading,
+    loadingMore,
+    error: infiniteError,
+    hasMore,
+    observerRef,
+  } = useInfiniteScroll<Simulation>({
+    fetchFn: fetchSimulations,
+    enabled: !!selectedRepo,
+    pageSize: 10,
+  });
+
+  // Update simulations when repo changes
   useEffect(() => {
     if (!selectedRepo) return;
 
@@ -230,6 +258,40 @@ export default function SimulationsHistoryPage() {
                 </div>
               </div>
             ))}
+            
+            {/* Infinite scroll trigger */}
+            {hasMore && (
+              <div ref={observerRef} className="flex justify-center py-4">
+                {loadingMore && (
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                )}
+              </div>
+            )}
+            
+            {!hasMore && simulations.length > 0 && (
+              <p className="text-center text-muted-foreground py-4">
+                No more simulations to load
+              </p>
+            )}
+            
+            {/* Export menu */}
+            <div className="flex justify-end pt-4">
+              <ExportMenu
+                data={simulations}
+                filename="simulation-history"
+                columns={[
+                  { key: 'risk_score', header: 'Risk Score' },
+                  { key: 'risk_level', header: 'Risk Level' },
+                  { key: 'lines_added', header: 'Lines Added' },
+                  { key: 'lines_deleted', header: 'Lines Deleted' },
+                  { key: 'files_changed', header: 'Files Changed' },
+                  { key: 'created_at', header: 'Date' },
+                ]}
+                onExportStart={() => toast.loading('Exporting simulation history...')}
+                onExportSuccess={(format) => toast.success(`Exported as ${format}`)}
+                onExportError={(err) => toast.error('Export failed', { description: err.message })}
+              />
+            </div>
           </div>
         )}
       </main>
