@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useTheme } from "@/lib/ThemeProvider";
+import { Footer } from "./Footer";
 
 interface NavItem {
   href: string;
@@ -219,6 +220,7 @@ export function ClientLayout({ children, navItems }: ClientLayoutProps) {
       <main className="flex-1">
         {children}
       </main>
+      <Footer />
     </div>
   );
 }
